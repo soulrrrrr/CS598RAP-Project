@@ -24,3 +24,13 @@ This repository provides scripts and tools for generating, loading, and running 
 
 # 3. Run all TPC-DS benchmark queries
 ./run_queries.sh ./_queries ./tpcds_query_results
+```
+
+### Gen duckdb data in ducklake
+```bash
+sudo apt install python3-pip python3.10-venv -y
+python3 -m venv my_venv
+source my_venv/bin/activate
+pip3 install -r requirements.txt
+python3 generate_data.py
+```
