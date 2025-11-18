@@ -5,12 +5,12 @@ echo "---"
 echo "♻️ Ensuring a clean environment..."
 echo "Stopping and removing any existing services (docker compose down)..."
 # This is the new command:
-sudo docker compose down
+sudo docker compose -f "iceberg/docker-compose.yml" down
 
 echo "---"
 echo "🚀 Starting Docker containers (docker compose up -d)..."
 # We add --wait to ensure services are healthy before proceeding
-sudo docker compose up -d --wait
+sudo docker compose -f "iceberg/docker-compose.yml" up -d --wait
 
 echo "---"
 echo "Copying files to Spark container..."

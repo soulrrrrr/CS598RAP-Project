@@ -19,7 +19,7 @@ This repository provides scripts and tools for generating, loading, and running 
 
 ### Example Workflow
 ```bash
-# 1. Generate TPC-DS queries and data (from local machine)
+# 1. Generate TPC-DS queries and data (run this script from local machine)
 ./tpcds_gen.sh
 
 # 2. Create DuckDB database and load data
@@ -29,23 +29,24 @@ This repository provides scripts and tools for generating, loading, and running 
 ./run_queries.sh ./_queries ./tpcds_query_results
 ```
 
-### Gen duckdb data in ducklake
+### Gen duckdb data
 ```bash
 sudo apt install python3-pip python3.10-venv -y
 python3 -m venv my_venv
 source my_venv/bin/activate
 pip3 install -r requirements.txt
-python3 generate_data.py
 ```
 
-### Put iceberg data in spark, query it from duckdb
+### Put iceberg data in spark, and put duckdb data in ducklake, query it from duckdb
 1. [Install docker](https://docs.docker.com/engine/install/ubuntu/)
 2. Start spark-iceberg. Copy necessary file. Run script
 ```bash
-./setup_iceberg.sh
+./iceberg/setup_iceberg.sh
+./iceberg/setup_ducklake.sh
 ```
 3. Query in duckdb
 ```bash
+source my_venv/bin/activate
 python3 query.py
 ```
 4. stop

@@ -2,11 +2,25 @@ import duckdb
 import sys
 
 class Querier:
-    def __init__(self):
+    def __init__(self, ducklake_metadata_path: str, ducklake_data_folder_path: str):
         """Initializes the connection and sets up Iceberg."""
         print("Connecting to DuckDB...")
         self.con = duckdb.connect()
+        self.init_ducklake(ducklake_metadata_path, ducklake_data_folder_path)
         self.init_iceberg()
+
+    def init_ducklake(self, metadata_path: str, data_folder_path: str):
+        """Loads extensions in Ducklake."""
+        try:
+            self.con.sql(f"""
+    INSTALL ducklake;
+    LOAD ducklake;
+    ATTACH 'ducklake:{metadata_path}' AS my_ducklake (DATA_PATH '{data_folder_path}');
+            """)
+            print("✅ Ducklake: my_ducklake attached.")
+        except Exception as e:
+            print(f"❌ Error during Ducklake initialization: {e}", file=sys.stderr)
+            raise
 
     def init_iceberg(self):
         """Loads extensions and attaches the Iceberg catalog."""
@@ -36,13 +50,8 @@ class Querier:
         URL_STYLE 'path',
         USE_SSL false
     );
-    
-    /* Set the default schema. 
-    This means queries like 'SELECT * FROM customer' will work.
-    */
-    SET schema 'demo.tpcds';
             """)
-            print("✅ Catalog 'demo' attached and schema set to 'demo.tpcds'.")
+            print("✅ Iceberg: Catalog 'demo' attached.")
         except Exception as e:
             print(f"❌ Error during Iceberg initialization: {e}", file=sys.stderr)
             raise
@@ -51,7 +60,28 @@ class Querier:
         """
         Reads an SQL query from a file and executes it.
         """
-        if query_type.lower() != "iceberg":
+        if query_type.lower() == "iceberg":
+            try:
+                self.con.sql("""
+            /* Set the default schema. 
+            This means queries like 'SELECT * FROM customer' will work.
+            */
+            SET schema 'demo.tpcds';
+                """)
+                print("Iceberg: schema set to 'demo.tpcds'")
+            except Exception as e:
+                print(f"❌ Error during switching to Iceberg: {e}", file=sys.stderr)
+                raise
+        elif query_type.lower() == "ducklake":
+            try:
+                self.con.sql("""
+            USE my_ducklake;
+                """)
+                print("Ducklake: schema set to my_ducklake")
+            except Exception as e:
+                print(f"❌ Error during switching to Ducklake: {e}", file=sys.stderr)
+                raise
+        else:
             print(f"Query type '{query_type}' not supported.")
             return None
 
@@ -79,24 +109,17 @@ class Querier:
             print(f"❌ An error occurred during query execution: {e}", file=sys.stderr)
             return None
 
-def main_interactive():
+def main_interactive(querier):
     """
     Runs the interactive query shell.
     """
-    print("--- Starting Interactive Iceberg Query Shell ---")
-    try:
-        # Initialize the querier once
-        querier = Querier()
-    except Exception as e:
-        print(f"Failed to initialize Querier. Exiting. Error: {e}", file=sys.stderr)
-        return
-
-    print("\nType 'exit' or press Ctrl+C to quit.")
+    print("\n--- Starting Interactive Query Shell ---")
+    print("Type 'exit' or press Ctrl+C to quit.")
     
     while True:
         try:
             print("-------------------------------------------------")
-            query_type = input("Enter query type (e.g., 'iceberg')> ")
+            query_type = input("Enter query type (iceberg/ducklake)> ")
             if query_type.lower() == 'exit':
                 break
             
@@ -123,5 +146,53 @@ def main_interactive():
 
     print("\nExiting query shell. Goodbye!")
 
+def main_single_query(querier, query_type: str, sql_path: str):
+    """
+    Runs a single query based on command line arguments and exits.
+    """
+    print(f"--- Running Single Query for '{query_type}' ---")
+    
+    result = querier.query(query_type, sql_path)
+    
+    if result is not None:
+        print("\n--- Final Query Result ---")
+        print(result)
+        print("--------------------------\n")
+    else:
+        print("Query execution failed or returned no result.")
+
+
 if __name__ == "__main__":
-    main_interactive()
+    
+    # 1. Initialize Querier instance (done once)
+    try:
+        # Define default paths for the Ducklake database
+        querier = Querier(
+            ducklake_metadata_path = 'ducklake/metadata.ducklake',
+            ducklake_data_folder_path = 'ducklake/data_files'
+        )
+    except Exception as e:
+        print(f"Failed to initialize Querier. Exiting. Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # 2. Handle command line arguments
+    num_args = len(sys.argv)
+
+    if num_args == 2 and sys.argv[1] == '-i':
+        # Interactive mode: python query.py -i
+        main_interactive(querier)
+    elif num_args == 3:
+        # Single query mode: python query.py <query_type> <sql_path>
+        query_type = sys.argv[1]
+        sql_path = sys.argv[2]
+        main_single_query(querier, query_type, sql_path)
+    else:
+        # Print usage instructions
+        print("--- Usage ---")
+        print("Interactive mode:")
+        print("  python query.py -i")
+        print("\nSingle query mode:")
+        print("  python query.py <query_type> <sql_path>")
+        print("\n<query_type> must be 'iceberg' or 'ducklake'.")
+        print("Example: python query.py iceberg tpcds_q1.sql")
+        sys.exit(1)
