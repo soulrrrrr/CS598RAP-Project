@@ -39,13 +39,6 @@ echo "---"
 echo "🏃 Running PySpark Delta job inside container..."
 docker exec -it spark-delta bash -c "python3 /home/spark/delta_generate.py"
 
-
-echo "Copying data back to host"
-docker cp spark-delta:/home/spark/data "$LOCAL_EXPORT_DIR"
-
-echo "---"
-echo "📁 Data copied to: $LOCAL_EXPORT_DIR"
-
 echo "---"
 echo "✅ Done! Delta table created at ./data/delta_table"
 

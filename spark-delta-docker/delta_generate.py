@@ -56,7 +56,7 @@ def main():
     spark = create_spark_session()
     DATABASE = "tpcds"
     DATA_PATH = "/home/spark/data1gb/"
-    DELTA_PATH = "/home/spark/data/delta_tables"
+    DELTA_PATH = "/home/spark/data/"
 
     # May not need the below line as we will do delta_scan from duckDB
     # spark.sql(f"CREATE DATABASE IF NOT EXISTS {DATABASE}")
