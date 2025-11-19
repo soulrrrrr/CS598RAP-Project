@@ -17,37 +17,30 @@ This repository provides scripts and tools for generating, loading, and running 
 ### Data
 - **1GB Dataset:** [Download here](https://drive.google.com/file/d/1Z2NGxApeZzETB_DGMxRoXMcZaoRuDPMz/view?usp=sharing)
 
-### Example Workflow
+### Example Generate data (or download it)
 ```bash
 # 1. Generate TPC-DS queries and data (run this script from local machine)
 ./tpcds_gen.sh
-
-# 2. Create DuckDB database and load data
-./create_load_script.sh
-
-# 3. Run all TPC-DS benchmark queries
-./run_queries.sh ./_queries ./tpcds_query_results
 ```
 
-### Gen duckdb data
+### Setup iceberg and ducklake
 ```bash
 sudo apt install python3-pip python3.10-venv -y
 python3 -m venv my_venv
 source my_venv/bin/activate
 pip3 install -r requirements.txt
 ```
-
-### Put iceberg data in spark, and put duckdb data in ducklake, query it from duckdb
+0. Put data in /mydata/data1gb
 1. [Install docker](https://docs.docker.com/engine/install/ubuntu/)
 2. Start spark-iceberg. Copy necessary file. Run script
 ```bash
 ./iceberg/setup_iceberg.sh
-./iceberg/setup_ducklake.sh
+./ducklake/setup_ducklake.sh
 ```
 3. Query in duckdb
 ```bash
 source my_venv/bin/activate
-python3 query.py
+python3 query.py -i
 ```
 4. stop
 sudo docker compose down
