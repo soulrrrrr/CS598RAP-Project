@@ -1,3 +1,75 @@
-my_venv/*
+# Python virtual environments
+venv/
+my_venv/
+.venv/
+env/
+ENV/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Data directories (TPC-DS datasets, converted formats)
+data/
+/data/delta/
+/data/tpcds_raw/
+/data/parquet/
+/data/iceberg/
+
+# DuckLake data files
 ducklake/data_files/*
 ducklake/metadata.ducklake
+
+# DuckDB database files
+*.db
+*.duckdb
+
+# Iceberg warehouse
+iceberg/warehouse/
+warehouse/
+
+# Delta Lake metadata
+delta/_delta_log/
+_delta_log/
+
+# Large result files (uncomment if results get too large)
+# results/*.parquet
+# results/*.csv
+
+# Docker volumes
+docker-compose.override.yml
+.env.local
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Logs
+*.log
+logs/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/

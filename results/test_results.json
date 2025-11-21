@@ -1,0 +1,41 @@
+{
+  "timestamp": "2025-11-20T17:23:27.223356",
+  "benchmark_version": "1.0.0",
+  "data_generation": {},
+  "format_conversions": {},
+  "query_results": [
+    {
+      "query_id": "Q3",
+      "format": "native",
+      "status": "success",
+      "cold_run_time_seconds": 0.01410675048828125,
+      "warm_run_times_seconds": [
+        0.012610673904418945,
+        0.01213383674621582,
+        0.012141942977905273
+      ],
+      "median_time_seconds": 0.012141942977905273,
+      "min_time_seconds": 0.01213383674621582,
+      "max_time_seconds": 0.012610673904418945,
+      "rows_returned": 38,
+      "num_runs": 3
+    },
+    {
+      "query_id": "Q19",
+      "format": "native",
+      "status": "success",
+      "cold_run_time_seconds": 0.0220489501953125,
+      "warm_run_times_seconds": [
+        0.02253103256225586,
+        0.021955251693725586,
+        0.021304845809936523
+      ],
+      "median_time_seconds": 0.021955251693725586,
+      "min_time_seconds": 0.021304845809936523,
+      "max_time_seconds": 0.02253103256225586,
+      "rows_returned": 100,
+      "num_runs": 3
+    }
+  ],
+  "metadata": {}
+}
