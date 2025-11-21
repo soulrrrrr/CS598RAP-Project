@@ -1,3 +1,28 @@
-duckdb
-pyarrow
-polars
+# Core dependencies
+duckdb>=1.1.0
+pyarrow>=14.0.0
+polars>=0.20.0
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Spark for Iceberg/Delta conversions
+pyspark>=3.5.0
+
+# Table formats
+delta-spark>=3.0.0
+
+# Configuration
+pyyaml>=6.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Testing
+pytest>=7.4.0
+
+# Utilities
+python-dateutil>=2.8.0
+tqdm>=4.65.0

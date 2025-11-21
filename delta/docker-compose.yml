@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  spark-delta:
+    image: bitnami/spark:3.4.1
+    container_name: spark-delta
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_HOST=spark-delta
+    ports:
+      - "8082:8080"
+      - "7077:7077"
+    volumes:
+      - ./delta_data:/opt/delta_data
+      - ./scripts:/opt/scripts
+networks:
+  default:
+    name: delta_net
