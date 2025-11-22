@@ -1,11 +1,15 @@
 import duckdb
 import sys
+from transform import wrap_with_iceberg_cte
 
 class Querier:
-    def __init__(self, ducklake_metadata_path: str, ducklake_data_folder_path: str):
+    def __init__(self, ducklake_metadata_path: str, ducklake_data_folder_path: str, iceberg_path: str):
         """Initializes the connection and sets up Iceberg."""
         print("Connecting to DuckDB...")
         self.con = duckdb.connect()
+        
+        self.iceberg_path = iceberg_path
+        
         self.init_ducklake(ducklake_metadata_path, ducklake_data_folder_path)
         self.init_iceberg()
 
@@ -15,7 +19,7 @@ class Querier:
             self.con.sql(f"""
     INSTALL ducklake;
     LOAD ducklake;
-    ATTACH 'ducklake:{metadata_path}' AS my_ducklake (DATA_PATH '{data_folder_path}');
+    ATTACH 'ducklake:{metadata_path}' AS my_ducklake (DATA_PATH '{data_folder_path}', OVERRIDE_DATA_PATH true);
             """)
             print("✅ Ducklake: my_ducklake attached.")
         except Exception as e:
@@ -27,31 +31,11 @@ class Querier:
         print("Initializing Iceberg catalog configuration...")
         try:
             self.con.sql("""
-    INSTALL httpfs;
-    LOAD httpfs;
     INSTALL iceberg;
     LOAD iceberg;
-    
-    /* Attach the catalog. 
-    NOTE: 'demo' is the catalog name in DuckDB.
-    */
-    ATTACH 'demo' AS demo (
-        TYPE ICEBERG,
-        ENDPOINT 'http://localhost:8181',
-        AUTHORIZATION_TYPE 'none'
-    );
-    
-    /* Create the S3 secret for MinIO */
-    CREATE OR REPLACE SECRET minio_s3 (
-        TYPE S3,
-        KEY_ID 'admin',
-        SECRET 'password',
-        ENDPOINT 'localhost:9000',
-        URL_STYLE 'path',
-        USE_SSL false
-    );
+    SET unsafe_enable_version_guessing = true;
             """)
-            print("✅ Iceberg: Catalog 'demo' attached.")
+            print("✅ Iceberg: Init.")
         except Exception as e:
             print(f"❌ Error during Iceberg initialization: {e}", file=sys.stderr)
             raise
@@ -60,31 +44,6 @@ class Querier:
         """
         Reads an SQL query from a file and executes it.
         """
-        if query_type.lower() == "iceberg":
-            try:
-                self.con.sql("""
-            /* Set the default schema. 
-            This means queries like 'SELECT * FROM customer' will work.
-            */
-            SET schema 'demo.tpcds';
-                """)
-                print("Iceberg: schema set to 'demo.tpcds'")
-            except Exception as e:
-                print(f"❌ Error during switching to Iceberg: {e}", file=sys.stderr)
-                raise
-        elif query_type.lower() == "ducklake":
-            try:
-                self.con.sql("""
-            USE my_ducklake;
-                """)
-                print("Ducklake: schema set to my_ducklake")
-            except Exception as e:
-                print(f"❌ Error during switching to Ducklake: {e}", file=sys.stderr)
-                raise
-        else:
-            print(f"Query type '{query_type}' not supported.")
-            return None
-
         try:
             # Correct way to run SQL from a file:
             # 1. Read the file content into a string.
@@ -95,8 +54,30 @@ class Querier:
             if not sql_query.strip():
                 print("Warning: SQL file is empty.")
                 return None
+            
+            if query_type.lower() == "iceberg":
+                try:
+                    sql_query = wrap_with_iceberg_cte(sql_query, base_path=self.iceberg_path)
+                    print("--- Generated Iceberg Query ---")
+                    print(sql_query)
+                    print("-----------------------------")
+                except Exception as e:
+                    print(f"❌ Error during switching to Iceberg: {e}", file=sys.stderr)
+                    raise
+            elif query_type.lower() == "ducklake":
+                try:
+                    self.con.sql("""
+                USE my_ducklake;
+                    """)
+                    print("Ducklake: schema set to my_ducklake")
+                except Exception as e:
+                    print(f"❌ Error during switching to Ducklake: {e}", file=sys.stderr)
+                    raise
+            else:
+                print(f"Query type '{query_type}' not supported.")
+                return None
 
-            # 2. Execute the SQL string.
+            # 3. Execute the SQL string.
             print("Executing query...")
             # .pl() formats the result as a Polars-like table
             result = self.con.sql(sql_query).pl() 
@@ -168,8 +149,9 @@ if __name__ == "__main__":
     try:
         # Define default paths for the Ducklake database
         querier = Querier(
-            ducklake_metadata_path = 'ducklake/metadata.ducklake',
-            ducklake_data_folder_path = 'ducklake/data_files'
+            ducklake_metadata_path = 'data/ducklake/metadata.ducklake',
+            ducklake_data_folder_path = 'data/ducklake/data_files',
+            iceberg_path = 'data/iceberg/tpcds'
         )
     except Exception as e:
         print(f"Failed to initialize Querier. Exiting. Error: {e}", file=sys.stderr)

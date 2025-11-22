@@ -1,68 +1,74 @@
 #!/bin/bash
-# -----------------------------------------------------------------------------
-# DuckDB Ducklake Initialization Script
-# 
-# This script executes a series of DuckDB commands to:
-# 1. Install and load the 'ducklake' extension.
-# 2. Read and execute two SQL files (assuming they exist in the 'ducklake/' directory).
-# 3. Attach a Ducklake database, defining its metadata and data file paths.
-# 4. Copy all data from the current in-memory database ('memory') into the 
-#    newly attached 'my_ducklake' database.
-#
-# Prerequisites: 
-# - The 'duckdb' command must be available in your PATH.
-# - The 'ducklake/' directory must exist and contain the specified SQL and data files/metadata.
-# -----------------------------------------------------------------------------
+set -e # Exit immediately if a command exits with a non-zero status
 
-# --- Configuration ---
+# --- 1. Dynamic Path Configuration ---
+# Get the directory where this script is located (e.g., .../ducklake)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get the parent directory (Project Root)
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Define paths relative to the script or project root
 DUCKDB_COMMAND="duckdb"
-DB_FILE=":memory:"  # Run commands against an in-memory database first
+DB_FILE=":memory:"
+OUTPUT_DATA_DIR="$PROJECT_ROOT/data/ducklake"
+METADATA_FILE="$OUTPUT_DATA_DIR/metadata.ducklake"
+DATA_FILES_DIR="$OUTPUT_DATA_DIR/data_files"
+
+# SQL files are assumed to be in the same directory as this script
+SQL_SCHEMA="$SCRIPT_DIR/tpcds_no_dbgen.sql"
+SQL_LOAD="$SCRIPT_DIR/load_data.sql"
+
+echo "---"
+echo "📍 Context:"
+echo "   Script Location:  $SCRIPT_DIR"
+echo "   Output Data Dir:  $OUTPUT_DATA_DIR"
+echo "   Schema File:      $SQL_SCHEMA"
+echo "---"
 
 # Check if duckdb command is available
-if ! command -v $DUCKDB_COMMAND &> /dev/null
-then
-    echo "❌ Error: $DUCKDB_COMMAND could not be found." >&2
-    echo "Please ensure DuckDB is installed and available in your system PATH." >&2
+if ! command -v $DUCKDB_COMMAND &> /dev/null; then
+    echo "❌ Error: '$DUCKDB_COMMAND' command not found." >&2
+    echo "Please install DuckDB and ensure it is in your PATH." >&2
     exit 1
+fi
+
+# Ensure output directory exists
+if [ -d "$OUTPUT_DATA_DIR" ]; then
+    echo "⚠️  Warning: Output directory '$OUTPUT_DATA_DIR' already exists."
+else
+    echo "📂 Creating output directory: $OUTPUT_DATA_DIR"
+    mkdir -p "$OUTPUT_DATA_DIR"
 fi
 
 echo "--- Starting DuckDB Ducklake Setup ---"
 
-# Use a here-document (<<<) to pipe all commands into the duckdb client
+# Execute DuckDB commands
 $DUCKDB_COMMAND $DB_FILE <<EOF
--- 1. Install the ducklake extension
+-- 1. Install and Load ducklake
 INSTALL ducklake;
-
--- 2. Load the installed extension
 LOAD ducklake;
 
--- 3. Read and execute the schema definition (T-PCDS schema)
-.read ducklake/tpcds_no_dbgen.sql
+-- 2. Read schema and load data (Input SQL files)
+.read '$SQL_SCHEMA'
+.read '$SQL_LOAD'
 
--- 4. Read and execute the data loading commands
-.read ducklake/load_data.sql
+-- 3. Attach the Ducklake database (Output Configuration)
+--    Using the path variables defined in the bash script
+ATTACH 'ducklake:$METADATA_FILE' AS my_ducklake (DATA_PATH '$DATA_FILES_DIR');
 
--- 5. Attach the Ducklake database. This defines where the metadata file 
---    is located and where the actual data files live.
-ATTACH 'ducklake:ducklake/metadata.ducklake' AS my_ducklake (DATA_PATH 'ducklake/data_files');
-
--- 6. Copy all tables/data from the source (in-memory) database to the attached Ducklake target.
+-- 4. Copy data from memory to Ducklake
+--    Using SELECT to log progress instead of bash 'echo'
+SELECT '🚀 Copying data to Ducklake...' AS status;
 COPY FROM DATABASE memory TO my_ducklake;
 
--- Show status or list tables for verification (optional)
-PRAGMA database_list;
-SELECT 'Successfully loaded and copied data to my_ducklake' AS Status;
+-- Verification
+SELECT '✅ Successfully loaded ' || count(*) || ' tables into my_ducklake' AS status 
+FROM information_schema.tables 
+WHERE table_catalog = 'my_ducklake';
 
 EOF
 
-# Check the exit status of the duckdb command
-if [ $? -eq 0 ]; then
-    echo "✅ DuckDB commands executed successfully. The Ducklake database 'my_ducklake' is ready."
-else
-    echo "❌ An error occurred during the execution of DuckDB commands." >&2
-    exit 1
-fi
-
-# Note: After this script runs, the database 'my_ducklake' will be correctly set up 
-# on disk, but the DuckDB connection will have closed. To use it in a new session, 
-# you will need to re-ATTACH it.
+echo "---"
+echo "✅ Ducklake pipeline finished successfully!"
+echo "   Metadata: $METADATA_FILE"
+echo "   Data:     $DATA_FILES_DIR"
