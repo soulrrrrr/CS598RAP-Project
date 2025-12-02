@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+BASE_DIR="${DATA_ROOT:-.}"
 CONTAINER_NAME="spark-delta"
 IMAGE="apache/spark:3.4.1-scala2.12-java11-python3-ubuntu"
 
@@ -33,12 +34,12 @@ echo "Copying files to Spark container..."
 # TODO: Make sure the source is correct
 docker cp ./delta/delta_generate.py spark-delta:/home/spark/delta_generate.py
 docker cp ./tpcds_schema.py spark-delta:/home/spark/tpcds_schema.py
-docker cp ./data1gb/. spark-delta:/home/spark/data1gb/
+docker cp "${BASE_DIR}/data1gb/." spark-delta:/home/spark/data1gb/
 
 echo "---"
 echo "🏃 Running PySpark Delta job inside container..."
 docker exec -it spark-delta bash -c "python3 /home/spark/delta_generate.py"
 
 echo "---"
-echo "✅ Done! Delta table created at ./delta/data"
+echo "✅ Done! Delta table created at ./data/delta"
 

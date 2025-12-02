@@ -36,7 +36,7 @@ $SUDO apt-get update -qq
 # Note: 'duckdb' package might not be in default repos for all distros, 
 # so we allow it to fail without stopping the script (|| true) just for that package if needed,
 # but here we keep it strict as per original script logic.
-$SUDO apt-get install -y build-essential gcc-9 make flex bison byacc git duckdb || echo "Warning: apt install had issues, continuing..."
+$SUDO apt-get install -y build-essential gcc-9 make flex bison byacc git || echo "Warning: apt install had issues, continuing..."
 
 # Find the 'tools' subdirectory inside the TPC-DS-Tool folder
 TOOLS_SUBDIR=$(find "$TOOL_DIR" -type d -name tools | head -n1)

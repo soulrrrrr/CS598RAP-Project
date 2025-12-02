@@ -25,9 +25,12 @@ All benchmarks use **DuckDB** as the query engine.
 python3 -m venv venv
 source venv/bin/activate  # On macOS/Linux
 pip install -r requirements.txt
+curl https://install.duckdb.org | sh # duckdb
+echo 'export PATH=$HOME/.duckdb/cli/latest:$PATH' >> ~/.bashrc
+source ~/.bashrc # add duckdb to PATH
 
 # Install Docker (required for Iceberg and Delta setup)
-# https://docs.docker.com/get-docker/
+# https://docs.docker.com/engine/install/ubuntu/
 ```
 
 ### 2. Get TPC-DS Data
@@ -38,6 +41,9 @@ pip install -r requirements.txt
 **Option B: Generate data yourself**
 ```bash
 ./tpcds_gen.sh
+./ducklake/setup_ducklake.sh
+./iceberg/setup_iceberg.sh
+sudo DATA_ROOT=/mydata ./delta/start.sh # DATA_ROOT is your data path
 ```
 
 ### 3. Convert Data to Table Formats
