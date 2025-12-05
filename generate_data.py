@@ -282,7 +282,7 @@ class DataGenerator:
 
         try:
             # Run setup script
-            script_path = self.project_root / "benchmark" / "preparation" / "setup_delta_conversion.sh"
+            script_path = self.project_root / "benchmark" / "preparation" / "data_conversion" / "setup_delta_conversion.sh"
 
             print(f"🐳 Running Delta conversion via Docker...")
             print(f"📍 Script: {script_path}")
@@ -324,7 +324,7 @@ class DataGenerator:
 
         try:
             # Run setup script
-            script_path = self.project_root / "benchmark" / "preparation" / "setup_iceberg_conversion.sh"
+            script_path = self.project_root / "benchmark" / "preparation" / "data_conversion" / "setup_iceberg_conversion.sh"
 
             print(f"🐳 Running Iceberg conversion via Docker...")
             print(f"📍 Script: {script_path}")
