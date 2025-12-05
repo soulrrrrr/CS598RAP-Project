@@ -14,10 +14,7 @@ __pycache__/
 
 # Data directories (TPC-DS datasets, converted formats)
 data/
-/data/delta/
-/data/tpcds_raw/
-/data/parquet/
-/data/iceberg/
+data_backups/
 
 # DuckLake data files
 ducklake/data_files/*
@@ -35,9 +32,13 @@ warehouse/
 delta/_delta_log/
 _delta_log/
 
-# Large result files (uncomment if results get too large)
-# results/*.parquet
-# results/*.csv
+# Benchmark results
+results/*
+!results/.gitkeep
+
+# Keep result documentation
+!results/BENCHMARK_SUMMARY.md
+!results/VISUALIZATION_GUIDE.md
 
 # Docker volumes
 docker-compose.override.yml

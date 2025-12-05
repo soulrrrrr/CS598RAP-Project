@@ -91,9 +91,14 @@ class MetricsCollector:
 
         # Write to CSV
         if flat_results:
-            keys = flat_results[0].keys()
+            # Collect all unique keys from all results (including error fields)
+            all_keys = set()
+            for result in flat_results:
+                all_keys.update(result.keys())
+            fieldnames = sorted(all_keys)  # Sort for consistent column order
+
             with open(filepath, 'w', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=keys)
+                writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
                 writer.writeheader()
                 writer.writerows(flat_results)
 
@@ -188,17 +193,15 @@ class MetricsCollector:
                     'error': result.get('error', 'Unknown error')
                 }
 
-        # Calculate speedups
+        # Calculate speedups (using ducklake as baseline)
         for query_id, formats in comparison.items():
-            if all(isinstance(formats.get(f, {}).get('time'), (int, float))
-                   for f in ['native', 'iceberg', 'delta'] if f in formats):
-
-                times = {f: formats[f]['time'] for f in formats if 'time' in formats[f]}
-                if times:
-                    baseline = times.get('native', min(times.values()))
-                    for fmt in times:
-                        if baseline > 0:
-                            formats[fmt]['speedup'] = baseline / times[fmt]
+            times = {f: formats[f]['time'] for f in formats if 'time' in formats.get(f, {})}
+            if times:
+                # Use ducklake as baseline, fallback to fastest
+                baseline = times.get('ducklake', min(times.values()))
+                for fmt in times:
+                    if baseline > 0:
+                        formats[fmt]['speedup'] = baseline / times[fmt]
 
         return comparison
 
@@ -229,20 +232,20 @@ class MetricsCollector:
             print("\n" + "-" * 70)
             print("QUERY COMPARISON")
             print("-" * 70)
-            print(f"{'Query':<10} {'Native':<12} {'Iceberg':<12} {'Delta':<12}")
+            print(f"{'Query':<10} {'DuckLake':<12} {'Iceberg':<12} {'Delta':<12}")
             print("-" * 70)
 
             for query_id in sorted(comparison.keys(), key=lambda x: str(x)):
                 formats = comparison[query_id]
 
-                native_time = formats.get('native', {}).get('time', 'N/A')
+                ducklake_time = formats.get('ducklake', {}).get('time', 'N/A')
                 iceberg_time = formats.get('iceberg', {}).get('time', 'N/A')
                 delta_time = formats.get('delta', {}).get('time', 'N/A')
 
-                native_str = f"{native_time:.3f}s" if isinstance(native_time, (int, float)) else native_time
+                ducklake_str = f"{ducklake_time:.3f}s" if isinstance(ducklake_time, (int, float)) else ducklake_time
                 iceberg_str = f"{iceberg_time:.3f}s" if isinstance(iceberg_time, (int, float)) else iceberg_time
                 delta_str = f"{delta_time:.3f}s" if isinstance(delta_time, (int, float)) else delta_time
 
-                print(f"{query_id:<10} {native_str:<12} {iceberg_str:<12} {delta_str:<12}")
+                print(f"{query_id:<10} {ducklake_str:<12} {iceberg_str:<12} {delta_str:<12}")
 
         print("=" * 70)

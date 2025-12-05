@@ -14,19 +14,23 @@ from benchmark.utils.logger import setup_logger
 class QueryExecutor:
     """Execute queries and collect performance metrics."""
 
-    def __init__(self, format_type: str, data_path: str, config: dict, logger=None):
+    def __init__(self, format_type: str, data_path: str, config: dict, logger=None, ducklake_metadata: str = None, ducklake_data: str = None):
         """
         Initialize query executor.
 
         Args:
-            format_type: Format to query ('native', 'iceberg', 'delta')
+            format_type: Format to query ('ducklake', 'iceberg', 'delta')
             data_path: Path to data files
             config: DuckDB configuration dictionary
             logger: Optional logger instance
+            ducklake_metadata: Path to DuckLake metadata file (for ducklake format)
+            ducklake_data: Path to DuckLake data directory (for ducklake format)
         """
         self.format_type = format_type
         self.data_path = Path(data_path)
         self.config = config
+        self.ducklake_metadata = ducklake_metadata
+        self.ducklake_data = ducklake_data
         self.logger = logger or setup_logger(f"query_executor_{format_type}")
 
         # Create DuckDB connection
@@ -63,30 +67,34 @@ class QueryExecutor:
         """Setup extensions and configuration for specific format."""
         self.logger.info(f"Setting up format: {self.format_type}")
 
-        if self.format_type == 'iceberg':
+        if self.format_type == 'ducklake':
+            # DuckLake format
+            self.conn.execute("INSTALL ducklake")
+            self.conn.execute("LOAD ducklake")
+
+            # Attach DuckLake database
+            if self.ducklake_metadata and self.ducklake_data:
+                attach_sql = f"""
+                    ATTACH 'ducklake:{self.ducklake_metadata}' AS ducklake_db
+                    (DATA_PATH '{self.ducklake_data}', OVERRIDE_DATA_PATH true)
+                """
+                self.conn.execute(attach_sql)
+                self.logger.info(f"DuckLake database attached: {self.ducklake_metadata}")
+            else:
+                raise ValueError("DuckLake format requires ducklake_metadata and ducklake_data paths")
+
+        elif self.format_type == 'iceberg':
             self.conn.execute("INSTALL iceberg")
             self.conn.execute("LOAD iceberg")
-            self.conn.execute("INSTALL httpfs")
-            self.conn.execute("LOAD httpfs")
-
-            # Configure S3 access for MinIO
-            self.conn.execute("SET s3_endpoint='localhost:9000'")
-            self.conn.execute("SET s3_access_key_id='admin'")
-            self.conn.execute("SET s3_secret_access_key='password'")
-            self.conn.execute("SET s3_use_ssl=false")
-            self.conn.execute("SET s3_url_style='path'")
+            # Enable version guessing for local Iceberg tables
             self.conn.execute("SET unsafe_enable_version_guessing=true")
 
-            self.logger.info("Iceberg extension loaded with S3/MinIO access")
+            self.logger.info("Iceberg extension loaded with local filesystem access")
 
         elif self.format_type == 'delta':
             self.conn.execute("INSTALL delta")
             self.conn.execute("LOAD delta")
             self.logger.info("Delta extension loaded")
-
-        elif self.format_type == 'native':
-            # Native DuckDB/Parquet - no extensions needed
-            self.logger.info("Using native Parquet reading")
 
         else:
             raise ValueError(f"Unknown format type: {self.format_type}")
@@ -107,13 +115,20 @@ class QueryExecutor:
 
     def _create_table_view(self, table_name: str):
         """Create a view for a single table."""
-        if self.format_type == 'iceberg':
-            # For Iceberg, use iceberg_scan with S3 path
-            # Path format: s3://warehouse/<database>/<table>
-            s3_path = f"s3://warehouse/tpcds/{table_name}"
+        if self.format_type == 'ducklake':
+            # For DuckLake, reference the attached database
             self.conn.execute(f"""
                 CREATE OR REPLACE VIEW {table_name} AS
-                SELECT * FROM iceberg_scan('{s3_path}', allow_moved_paths=true)
+                SELECT * FROM ducklake_db.main.{table_name}
+            """)
+
+        elif self.format_type == 'iceberg':
+            # For Iceberg, use iceberg_scan with local filesystem path
+            # This avoids REST catalog and S3/MinIO overhead
+            table_path = self.data_path / table_name
+            self.conn.execute(f"""
+                CREATE OR REPLACE VIEW {table_name} AS
+                SELECT * FROM iceberg_scan('{table_path}', allow_moved_paths=true)
             """)
 
         elif self.format_type == 'delta':
@@ -122,15 +137,6 @@ class QueryExecutor:
             self.conn.execute(f"""
                 CREATE OR REPLACE VIEW {table_name} AS
                 SELECT * FROM delta_scan('{table_path}')
-            """)
-
-        elif self.format_type == 'native':
-            # For native, read Parquet files directly
-            # Assuming parquet directory structure
-            parquet_path = self.data_path / f"{table_name}.parquet"
-            self.conn.execute(f"""
-                CREATE OR REPLACE VIEW {table_name} AS
-                SELECT * FROM read_parquet('{parquet_path}')
             """)
 
     def execute_query(

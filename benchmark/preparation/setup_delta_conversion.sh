@@ -20,7 +20,8 @@ docker cp "${CONVERSION_SCRIPT}" spark-iceberg:/tmp/convert_parquet_to_delta.py
 
 echo ""
 echo "Step 2: Installing Delta Lake in container..."
-docker exec spark-iceberg pip install delta-spark==2.4.0
+docker exec spark-iceberg pip uninstall -y delta-spark pyspark || true
+docker exec spark-iceberg pip install delta-spark==3.2.0
 
 echo ""
 echo "Step 3: Running Delta conversion inside Docker container..."

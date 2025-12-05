@@ -1,4 +1,4 @@
-"""Run comparison benchmark between Native Parquet and Iceberg formats."""
+"""Run comparison benchmark between DuckLake, Delta Lake, and Apache Iceberg formats."""
 
 import sys
 from pathlib import Path
@@ -14,38 +14,26 @@ from benchmark.utils.logger import setup_logger
 config = ConfigLoader()
 logger = setup_logger("comparison_benchmark")
 
-# Query definitions
-QUERIES = {
-    'Q3': """
-        SELECT dt.d_year, item.i_brand_id, item.i_brand,
-               SUM(ss_ext_sales_price) sum_agg
-        FROM date_dim dt, store_sales, item
-        WHERE dt.d_date_sk = store_sales.ss_sold_date_sk
-          AND store_sales.ss_item_sk = item.i_item_sk
-          AND item.i_manufact_id = 128
-          AND dt.d_moy = 11
-        GROUP BY dt.d_year, item.i_brand, item.i_brand_id
-        ORDER BY dt.d_year, sum_agg DESC, item.i_brand_id
-        LIMIT 100
-    """,
-    'Q19': """
-        SELECT i_brand_id, i_brand, i_manufact_id, i_manufact,
-               SUM(ss_ext_sales_price) ext_price
-        FROM date_dim, store_sales, item, customer, customer_address, store
-        WHERE d_date_sk = ss_sold_date_sk
-          AND ss_item_sk = i_item_sk
-          AND i_manager_id = 8
-          AND d_moy = 11
-          AND d_year = 1998
-          AND ss_customer_sk = c_customer_sk
-          AND c_current_addr_sk = ca_address_sk
-          AND SUBSTR(ca_zip, 1, 5) <> SUBSTR(s_zip, 1, 5)
-          AND ss_store_sk = s_store_sk
-        GROUP BY i_brand, i_brand_id, i_manufact_id, i_manufact
-        ORDER BY ext_price DESC, i_brand, i_brand_id, i_manufact_id, i_manufact
-        LIMIT 100
-    """
-}
+# Load queries from config
+def load_queries():
+    """Load queries from SQL files specified in config."""
+    queries = {}
+    query_dir = Path(config.get('paths.queries'))
+    query_ids = config.get('benchmark.queries')
+
+    for query_num in query_ids:
+        query_file = query_dir / f"query_{query_num}.sql"
+        if query_file.exists():
+            with open(query_file, 'r') as f:
+                query_sql = f.read()
+                queries[f'Q{query_num}'] = query_sql
+        else:
+            logger.warning(f"Query file not found: {query_file}")
+
+    return queries
+
+# Load queries from files
+QUERIES = load_queries()
 
 # TPC-DS tables
 TABLES = [
@@ -59,17 +47,17 @@ TABLES = [
 
 def main():
     logger.info("=" * 60)
-    logger.info("Starting Native vs Iceberg Comparison Benchmark")
+    logger.info("Starting DuckLake vs Delta vs Iceberg Comparison Benchmark")
     logger.info("=" * 60)
 
     # Initialize metrics collector
     results_dir = config.get('paths.results')
     collector = MetricsCollector(results_dir)
 
-    # Test formats
+    # Test formats - DuckLake as baseline
     formats_to_test = [
-        ('native', config.get('paths.tpcds_raw')),
-        ('iceberg', 's3://warehouse'),  # Not used for iceberg due to S3 direct access
+        ('ducklake', config.get('paths.ducklake')),
+        ('iceberg', config.get('paths.iceberg')),  # Local filesystem Iceberg
         ('delta', config.get('paths.delta'))
     ]
 
@@ -86,11 +74,20 @@ def main():
             'preserve_insertion_order': config.get('duckdb.preserve_insertion_order')
         }
 
+        # Get DuckLake paths if needed
+        ducklake_metadata = None
+        ducklake_data = None
+        if format_type == 'ducklake':
+            ducklake_metadata = config.get('paths.ducklake_metadata')
+            ducklake_data = config.get('paths.ducklake_data')
+
         executor = QueryExecutor(
             format_type=format_type,
             data_path=data_path,
             config=duckdb_config,
-            logger=logger
+            logger=logger,
+            ducklake_metadata=ducklake_metadata,
+            ducklake_data=ducklake_data
         )
 
         # Create views
@@ -104,12 +101,13 @@ def main():
             continue
 
         # Run queries
+        num_runs = config.get('benchmark.num_query_runs', 3)
         for query_id, query_sql in QUERIES.items():
             try:
                 metrics = executor.execute_query(
                     query=query_sql,
                     query_id=query_id,
-                    num_runs=3
+                    num_runs=num_runs
                 )
                 collector.add_query_results([metrics])
             except Exception as e:
@@ -134,8 +132,17 @@ def main():
     logger.info("=" * 60)
 
     try:
-        visualizer = BenchmarkVisualizer(json_file, results_dir)
-        visualizer.create_all_visualizations()
+        # Use new simplified visualization script
+        import subprocess
+        result = subprocess.run(
+            ['python3', 'benchmark/visualization/create_query_execution_charts.py'],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            logger.info("Visualizations created successfully")
+        else:
+            logger.error(f"Visualization script failed: {result.stderr}")
     except Exception as e:
         logger.error(f"Error creating visualizations: {e}")
 

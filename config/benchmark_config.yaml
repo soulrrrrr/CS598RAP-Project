@@ -1,74 +1,70 @@
-# TPC-DS Lakehouse Benchmark Configuration
-
 benchmark:
-  name: "TPC-DS Lakehouse Benchmark"
-  version: "1.0.0"
-  scale_factor: 1  # 1GB dataset
+  name: TPC-DS Lakehouse Benchmark
+  version: 1.0.0
+  scale_factor: 5
   formats:
-    - native    # Native DuckDB/Parquet
-    - iceberg
-    - delta
-
-  # Number of warm runs for each query (plus 1 cold run)
+  - ducklake
+  - iceberg
+  - delta
   num_query_runs: 3
-
-  # Queries to run (subset for initial testing)
   queries:
-    - 3
-    - 7
-    - 19
-    - 27
-    - 42
-    - 52
-    - 55
-    - 79
-
-# Data paths (relative to project root)
+  - 3
+  - 7
+  - 19
+  - 25
+  - 34
+  - 42
+  - 52
+  - 55
+  - 73
+  - 79
 paths:
-  project_root: "."
-  tpcds_raw: "data/tpcds_raw"
-  iceberg: "data/iceberg"
-  delta: "data/delta"
-  parquet: "data/parquet"
-  results: "results"
-  logs: "logs"
-  queries: "_queries"
-
-# DuckDB configuration
+  project_root: .
+  tpcds_raw: data/tpcds_raw
+  ducklake: data/ducklake
+  ducklake_metadata: data/ducklake/metadata.ducklake
+  ducklake_data: data/ducklake/data_files
+  iceberg: data/iceberg_local
+  delta: data/delta
+  parquet: data/parquet
+  results: results
+  logs: logs
+  queries: _queries
 duckdb:
-  memory_limit: "8GB"
+  memory_limit: 8GB
   threads: 4
   enable_object_cache: true
   preserve_insertion_order: false
-
-# Iceberg configuration
 iceberg:
-  catalog_type: "rest"  # rest or glue
+  catalog_type: rest
   rest:
-    endpoint: "http://localhost:8181"
-    catalog_name: "demo"
-    namespace: "tpcds"
+    endpoint: http://localhost:8181
+    catalog_name: demo
+    namespace: tpcds
   docker:
-    compose_file: "iceberg/docker-compose.yml"
-
-# Delta configuration
+    compose_file: iceberg/docker-compose.yml
 delta:
   use_spark: true
   spark:
-    master: "local[*]"
-    driver_memory: "4g"
-    executor_memory: "4g"
-
-# Metrics collection
+    master: local[*]
+    driver_memory: 4g
+    executor_memory: 4g
 metrics:
   collect_explain_analyze: true
   collect_timing: true
   collect_io_stats: true
-  output_format: "json"  # json, csv, or both
-
-# Logging
+  output_format: json
+insert_latency:
+  batch_sizes:
+  - 100
+  - 1000
+  - 10000
+  - 100000
+  test_tables:
+  - store_sales
+  - customer
 logging:
-  level: "INFO"
-  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: "logs/benchmark.log"
+  level: INFO
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  file: logs/benchmark.log
   console: true
