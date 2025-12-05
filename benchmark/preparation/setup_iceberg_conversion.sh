@@ -8,7 +8,7 @@ echo "=========================================="
 # Configuration
 PROJECT_ROOT="/Users/chongbinyao/dev/CS598RAP-Project"
 PARQUET_DATA_PATH="${PROJECT_ROOT}/data/tpcds_raw"
-CONVERSION_SCRIPT="${PROJECT_ROOT}/iceberg/archived_rest_setup/convert_parquet_to_iceberg_docker.py"
+CONVERSION_SCRIPT="${PROJECT_ROOT}/benchmark/preparation/convert_parquet_to_iceberg_docker.py"
 DOCKER_COMPOSE_FILE="${PROJECT_ROOT}/iceberg/docker-compose.yml"
 
 echo ""
