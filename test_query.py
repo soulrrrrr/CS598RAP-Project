@@ -17,12 +17,14 @@ try:
     # Load config
     config = ConfigLoader()
 
-    # Create query executor for native format
-    print("\n1. Creating query executor (native Parquet)...")
+    # Create query executor for DuckLake format
+    print("\n1. Creating query executor (DuckLake)...")
     executor = QueryExecutor(
-        format_type='native',
-        data_path=config.get('paths.tpcds_raw'),
-        config=config.get('duckdb')
+        format_type='ducklake',
+        data_path=config.get('paths.ducklake'),
+        config=config.get('duckdb'),
+        ducklake_metadata=config.get('paths.ducklake_metadata'),
+        ducklake_data=config.get('paths.ducklake_data')
     )
     print("   ✓ Executor created")
 

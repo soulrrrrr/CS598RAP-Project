@@ -45,9 +45,12 @@ class TPCDSGenerator:
         self.conn = duckdb.connect(':memory:')
         self.metrics = {}
 
-    def generate_data(self) -> Dict[str, Any]:
+    def generate_data(self, export_format: str = 'both') -> Dict[str, Any]:
         """
         Generate TPC-DS data at specified scale factor.
+
+        Args:
+            export_format: 'parquet', 'ducklake', or 'both' (default: 'both')
 
         Returns:
             Dictionary with generation metrics
@@ -61,8 +64,14 @@ class TPCDSGenerator:
             # Generate data in-memory
             self._generate_in_memory()
 
-            # Export to Parquet files
-            self._export_to_parquet()
+            # Export based on format
+            if export_format in ['parquet', 'both']:
+                # Export to Parquet files (for conversion to Iceberg/Delta)
+                self._export_to_parquet()
+
+            if export_format in ['ducklake', 'both']:
+                # Export directly to DuckLake format
+                self._export_to_ducklake()
 
             # Collect metrics
             self._collect_metrics()
@@ -151,6 +160,64 @@ class TPCDSGenerator:
 
         self.logger.info(f"Export completed in {export_time:.2f}s")
         self.logger.info(f"Total: {total_rows:,} rows, {total_size / (1024 ** 3):.2f} GB")
+
+    def _export_to_ducklake(self):
+        """Export all tables to DuckLake format."""
+        from pathlib import Path
+
+        ducklake_dir = Path(self.config.get('paths.ducklake', 'data/ducklake'))
+        ducklake_metadata = Path(self.config.get('paths.ducklake_metadata', 'data/ducklake/metadata.ducklake'))
+        ducklake_data = Path(self.config.get('paths.ducklake_data', 'data/ducklake/data_files'))
+
+        self.logger.info(f"Exporting tables to DuckLake: {ducklake_dir}")
+
+        # Remove existing DuckLake data
+        if ducklake_dir.exists():
+            import shutil
+            shutil.rmtree(ducklake_dir)
+
+        ducklake_dir.mkdir(parents=True, exist_ok=True)
+
+        export_start = time.time()
+
+        # Install and load ducklake extension
+        self.conn.execute("INSTALL ducklake")
+        self.conn.execute("LOAD ducklake")
+
+        # Attach DuckLake database
+        self.logger.info(f"  Attaching DuckLake database...")
+        attach_sql = f"""
+            ATTACH 'ducklake:{ducklake_metadata}' AS ducklake_db
+            (DATA_PATH '{ducklake_data}')
+        """
+        self.conn.execute(attach_sql)
+
+        # Copy all data from memory to DuckLake
+        self.logger.info(f"  Copying {len(self.TPCDS_TABLES)} tables to DuckLake...")
+        self.conn.execute("COPY FROM DATABASE memory TO ducklake_db")
+
+        export_time = time.time() - export_start
+
+        # Verify and collect stats
+        table_metrics = []
+        for table_name in self.TPCDS_TABLES:
+            row_count = self.conn.execute(
+                f"SELECT COUNT(*) FROM ducklake_db.main.{table_name}"
+            ).fetchone()[0]
+
+            table_metrics.append({
+                'table_name': table_name,
+                'row_count': row_count
+            })
+
+        total_rows = sum(t['row_count'] for t in table_metrics)
+
+        self.metrics['ducklake_export_time_seconds'] = export_time
+        self.metrics['ducklake_table_count'] = len(table_metrics)
+        self.metrics['ducklake_total_rows'] = total_rows
+
+        self.logger.info(f"DuckLake export completed in {export_time:.2f}s")
+        self.logger.info(f"DuckLake: {total_rows:,} total rows in {len(table_metrics)} tables")
 
     def _collect_metrics(self):
         """Collect final metrics."""
